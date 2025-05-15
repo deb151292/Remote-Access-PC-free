@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Folder GUI</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    /* Custom styles for drag-and-drop and animations */
+    .drag-over {
+      border: 2px dashed #3b82f6;
+      background-color: #e0f2fe;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .dark .modal-content {
+      background-color: #1f2937;
+      color: #e5e7eb;
+    }
+    .file-preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background-color: #f3f4f6;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+    .dark .file-preview {
+      background-color: #4b5563;
+    }
+    .breadcrumb {
+      display: inline-block;
+      padding: 4px 8px;
+      margin: 2px;
+      border-radius: 4px;
+      background-color: #e5e7eb;
+      color: #1f2937;
+      text-decoration: none;
+    }
+    .dark .breadcrumb {
+      background-color: #4b5563;
+      color: #e5e7eb;
+    }
+    .breadcrumb:hover {
+      background-color: #d1d5db;
+    }
+    .dark .breadcrumb:hover {
+      background-color: #6b7280;
+    }
+    .folder-name {
+      cursor: pointer;
+      color: #3b82f6;
+    }
+    .folder-name:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen p-6 transition-colors duration-300">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold flex items-center">
+      <span class="mr-2">📁</span> My PC Folder (Remote Access)
+    </h2>
+    <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700">
+      <span id="theme-icon">🌙</span>
+    </button>
+  </div>
+
+  <!-- Messages -->
+  {{if .Error}}
+    <div class="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg">
+      {{.Error}}
+    </div>
+  {{end}}
+  {{if .Success}}
+    <div class="mb-6 p-4 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg">
+      {{.Success}}
+    </div>
+  {{end}}
+
+  <!-- Navigation Controls -->
+  <div class="flex items-center space-x-4 mb-6">
+    <!-- Back Button -->
+    <button
+      id="back-btn"
+      class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500"
+    >
+      Back
+    </button>
+    <!-- Breadcrumb Navigation -->
+    <div class="flex flex-wrap items-center">
+      {{ $pathParts := split .CurrentPath (printf "%s" "\\") }}
+      {{ $current := "" }}
+      {{ range $index, $part := $pathParts }}
+        {{ if eq $part "" }}
+          {{ $current = "D:" }}
+          <a href="/?path=D:" class="breadcrumb">D:</a>
+        {{ else }}
+          {{ $current = printf "%s%s%s" $current (printf "%s" "\\") $part }}
+          <span class="mx-1">/</span>
+          <a href="/?path={{ $current }}" class="breadcrumb">{{ $part }}</a>
+        {{ end }}
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Create Folder and Search Bar in One Line -->
+  <div class="mb-6 flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0">
+    <!-- Create Folder -->
+    <form id="create-folder-form" action="/create-folder" method="post" class="flex items-center space-x-2 w-full md:w-1/2">
+      <input type="hidden" name="path" value="{{ .CurrentPath }}">
+      <input
+        type="text"
+        name="folderName"
+        placeholder="Folder name (default: New Folder)"
+        class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:border-gray-700 flex-1"
+      />
+      <button
+        type="submit"
+        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 whitespace-nowrap"
+      >
+        Create Folder
+      </button>
+    </form>
+
+    <!-- Search Bar -->
+    <div class="w-full md:w-1/2">
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search files..."
+        class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:border-gray-700"
+      />
+    </div>
+  </div>
+
+  <!-- Upload Area -->
+  <div
+    id="upload-area"
+    class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 mb-6 text-center bg-white dark:bg-gray-800"
+  >
+    <form id="upload-form" enctype="multipart/form-data" action="/upload" method="post">
+      <input type="hidden" name="path" value="{{ .CurrentPath }}" id="upload-path">
+      <input type="file" id="file-input" name="file" class="hidden" required />
+      <p class="text-gray-500 dark:text-gray-400">
+        Drag and drop files here or
+        <label for="file-input" class="text-blue-500 cursor-pointer hover:underline"> browse</label>
+      </p>
+      <!-- File Preview Area -->
+      <div id="file-preview" class="mt-2 flex flex-wrap gap-2 justify-center"></div>
+      <button
+        type="submit"
+        id="upload-btn"
+        class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center mx-auto"
+        disabled
+      >
+        <span>Upload</span>
+        <span id="loading-spinner" class="loading-spinner ml-2"></span>
+      </button>
+      <button
+        type="button"
+        id="clear-btn"
+        class="mt-2 px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 mx-auto hidden"
+      >
+        Clear
+      </button>
+    </form>
+  </div>
+
+  <!-- File Table -->
+  <div class="overflow-x-auto">
+    <table id="file-table" class="w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
+      <thead>
+        <tr class="border-b dark:border-gray-700">
+          <th class="p-4 text-left">Name</th>
+          <th class="p-4 text-left">Type</th>
+          <th class="p-4 text-left">Size</th>
+          <th class="p-4 text-left">Last Modified</th>
+          <th class="p-4 text-left">Action</th>
+        </tr>
+      </thead>
+      <tbody id="file-table-body">
+        {{range .Files}}
+          <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700" data-name="{{.Name}}" data-type="{{.Type}}">
+            <td class="p-4">
+              {{if eq .Type "folder"}}
+                <span class="folder-name" onclick="navigateToFolder('{{.Name}}')">{{.Name}}</span>
+              {{else}}
+                {{.Name}}
+              {{end}}
+            </td>
+            <td class="p-4">{{.Type}}</td>
+            <td class="p-4">{{.Size}}</td>
+            <td class="p-4">{{.Modified}}</td>
+            <td class="p-4">
+              <a href="/download?file={{.Name}}&path={{$.CurrentPath}}" class="text-blue-500 hover:underline">Download</a>
+              <button
+                onclick="showDeleteModal('{{.Name}}', '{{.Type}}')"
+                class="ml-4 text-red-500 hover:underline"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal">
+    <div class="modal-content">
+      <p>Are you sure you want to delete <span id="delete-file-name"></span> (<span id="delete-file-type"></span>)?</p>
+      <div class="mt-4 flex justify-center space-x-4">
+        <button
+          id="confirm-delete"
+          class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+        >
+          Yes
+        </button>
+        <button
+          id="cancel-delete"
+          class="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500"
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript for Interactivity -->
+  <script>
+    // Theme Toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const body = document.body;
+
+    themeToggle.addEventListener('click', () => {
+      body.classList.toggle('dark');
+      themeIcon.textContent = body.classList.contains('dark') ? '☀️' : '🌙';
+      localStorage.setItem('theme', body.classList.contains('dark') ? 'dark' : 'light');
+    });
+
+    // Load theme from localStorage
+    if (localStorage.getItem('theme') === 'dark') {
+      body.classList.add('dark');
+      themeIcon.textContent = '☀️';
+    }
+
+    // Back Button
+    const backBtn = document.getElementById('back-btn');
+    backBtn.addEventListener('click', () => {
+      const currentPath = '{{ .CurrentPath }}';
+      const defaultBaseDir = '{{ .DefaultBaseDir }}';
+      const sep = '{{ printf "%s" "\\" }}';
+
+      // Normalize paths for comparison
+      let normalizedCurrentPath = currentPath.replace(/\\/g, sep).replace(/\//g, sep);
+      let normalizedDefaultBaseDir = defaultBaseDir.replace(/\\/g, sep).replace(/\//g, sep);
+
+      // Remove trailing separator for consistent comparison
+      if (normalizedCurrentPath.endsWith(sep)) {
+        normalizedCurrentPath = normalizedCurrentPath.slice(0, -1);
+      }
+      if (normalizedDefaultBaseDir.endsWith(sep)) {
+        normalizedDefaultBaseDir = normalizedDefaultBaseDir.slice(0, -1);
+      }
+
+      // If already at defaultBaseDir, do nothing
+      if (normalizedCurrentPath === normalizedDefaultBaseDir) {
+        console.log('Already at defaultBaseDir, stopping navigation:', normalizedCurrentPath);
+        return;
+      }
+
+      const parts = normalizedCurrentPath.split(sep);
+      if (parts.length <= 1) {
+        console.log('At root, navigating to defaultBaseDir:', defaultBaseDir);
+        window.location.href = '/?path=' + encodeURIComponent(defaultBaseDir);
+        return;
+      }
+
+      parts.pop(); // Remove the last part
+      let parentPath = parts.join(sep);
+
+      // Ensure parentPath doesn't go above defaultBaseDir
+      if (parentPath === '' || parentPath === normalizedDefaultBaseDir.slice(0, 2)) { // e.g., "D:"
+        parentPath = defaultBaseDir;
+      }
+
+      console.log('Navigating back to:', parentPath);
+      window.location.href = '/?path=' + encodeURIComponent(parentPath);
+    });
+
+    // Drag-and-Drop Upload and File Preview
+    const uploadArea = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-input');
+    const uploadForm = document.getElementById('upload-form');
+    const uploadBtn = document.getElementById('upload-btn');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const filePreview = document.getElementById('file-preview');
+    const clearBtn = document.getElementById('clear-btn');
+    const uploadPathInput = document.getElementById('upload-path');
+
+    function updateFilePreview(files) {
+      filePreview.innerHTML = ''; // Clear previous preview
+      if (files.length === 0) {
+        uploadBtn.disabled = true;
+        clearBtn.classList.add('hidden');
+        return;
+      }
+      Array.from(files).forEach(file => {
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'file-preview';
+        fileDiv.textContent = file.name;
+        filePreview.appendChild(fileDiv);
+      });
+      uploadBtn.disabled = false;
+      clearBtn.classList.remove('hidden');
+    }
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('drag-over');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('drag-over');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('drag-over');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        updateFilePreview(files);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      updateFilePreview(fileInput.files);
+    });
+
+    clearBtn.addEventListener('click', () => {
+      fileInput.value = ''; // Clear the file input
+      updateFilePreview([]);
+    });
+
+    uploadForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      console.log('Submitting upload form with path:', uploadPathInput.value);
+      // Log the entire form data
+      const formData = new FormData(uploadForm);
+      console.log('Form data entries:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+      }
+      loadingSpinner.style.display = 'block';
+      uploadBtn.disabled = true;
+      clearBtn.classList.add('hidden');
+      // Simulate upload (actual submission handled by backend)
+      setTimeout(() => {
+        uploadForm.submit();
+      }, 1000);
+    });
+
+    // Search Functionality
+    const searchInput = document.getElementById('search-input');
+    const fileTableBody = document.getElementById('file-table-body');
+    const rows = fileTableBody.getElementsByTagName('tr');
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase();
+      for (let row of rows) {
+        const name = row.cells[0].textContent.toLowerCase();
+        row.style.display = name.includes(query) ? '' : 'none';
+      }
+    });
+
+    // Navigate to Folder (used for both single and double-click)
+    function navigateToFolder(name) {
+      const currentPath = '{{ .CurrentPath }}';
+      const sep = '{{ printf "%s" "\\" }}';
+      // Ensure the path is constructed correctly
+      let newPath = currentPath;
+      if (currentPath.endsWith(sep)) {
+        newPath = currentPath + name;
+      } else if (currentPath.endsWith(':')) {
+        // Handle root paths like D:
+        newPath = currentPath + sep + name;
+      } else {
+        newPath = currentPath + sep + name;
+      }
+      console.log('Navigating to folder:', newPath);
+      window.location.href = '/?path=' + encodeURIComponent(newPath);
+    }
+
+    // Single-Click on Folder Name (already handled via onclick in HTML)
+    // Double-Click to Open Folder
+    for (let row of rows) {
+      row.addEventListener('dblclick', () => {
+        const type = row.getAttribute('data-type');
+        if (type === 'folder') {
+          const name = row.getAttribute('data-name');
+          navigateToFolder(name);
+        }
+      });
+    }
+
+    // Delete Modal
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteFileName = document.getElementById('delete-file-name');
+    const deleteFileType = document.getElementById('delete-file-type');
+    const confirmDelete = document.getElementById('confirm-delete');
+    const cancelDelete = document.getElementById('cancel-delete');
+
+    function showDeleteModal(fileName, fileType) {
+      deleteFileName.textContent = fileName;
+      deleteFileType.textContent = fileType;
+      deleteModal.style.display = 'flex';
+    }
+
+    cancelDelete.addEventListener('click', () => {
+      deleteModal.style.display = 'none';
+    });
+
+    confirmDelete.addEventListener('click', () => {
+      const fileName = deleteFileName.textContent;
+      const currentPath = '{{ .CurrentPath }}';
+      // Send delete request to backend
+      fetch(`/delete?file=${encodeURIComponent(fileName)}&path=${encodeURIComponent(currentPath)}`, { method: 'DELETE' })
+        .then((res) => {
+          if (res.ok) {
+            location.reload(); // Reload to refresh file list
+          } else {
+            alert('Failed to delete');
+          }
+        })
+        .catch((err) => {
+          alert('Error deleting');
+          console.error(err);
+        });
+      deleteModal.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
