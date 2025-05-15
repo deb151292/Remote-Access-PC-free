@@ -2,6 +2,15 @@
 
 This is a web-based folder management GUI built with Go and Tailwind CSS. It allows you to browse, create, upload, and delete folders and files on your local system via a browser interface. This README provides instructions on running the application, changing the default path, and exposing it to other devices using ngrok.
 
+
+---
+
+## 📸 Preview
+
+![Remote File Manager](screenshot-remore-file-access.jpg)
+
+---
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed on your system:
