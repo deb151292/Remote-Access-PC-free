@@ -121,13 +121,13 @@
   <div class="flex items-center space-x-4 mb-6">
     <!-- Drive Dropdown (Windows only) -->
     {{if eq .OSType "windows"}}
-      <div class="relative">
-        <select id="drive-select" class="p-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          {{range .AvailableDrives}}
-            <option value="{{.}}">{{.}}</option>
-          {{end}}
-        </select>
-      </div>
+    <div class="relative">
+      <select id="drive-select" class="w-12 p-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {{range .AvailableDrives}}
+          <option value="{{.}}">{{.}}</option>
+        {{end}}
+      </select>
+    </div>
     {{end}}
 
     <!-- Back Button -->

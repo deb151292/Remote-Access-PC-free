@@ -264,7 +264,7 @@ func fileBrowser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse the template with the custom functions
-	tmpl, err := template.New("index.html").Funcs(funcMap).ParseFiles("templates/index.html")
+	tmpl, err := template.New("index.html").Funcs(funcMap).ParseFiles("website/index.html")
 	if err != nil {
 		log.Printf("Template parsing error: %v", err)
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
