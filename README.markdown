@@ -1,5 +1,4 @@
 # Remote File Manager GUI
-
 This is a web-based folder management GUI built with Go and Tailwind CSS. It allows you to browse, create, upload, and delete folders and files on your local system via a browser interface. This README provides instructions on running the application, changing the default path, and exposing it to other devices using LocalTunnel, with support for Windows, Linux, and macOS.
 
 ---
@@ -234,3 +233,4 @@ To access the application from other devices (e.g., a mobile phone or another co
 - [LocalTunnel Documentation](https://theboroer.github.io/localtunnel-www/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [Node.js Documentation](https://nodejs.org/en/docs/)
+
