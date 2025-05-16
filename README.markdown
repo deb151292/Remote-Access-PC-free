@@ -1,7 +1,6 @@
-# Folder Management GUI
+# Remote File Manager GUI
 
-This is a web-based folder management GUI built with Go and Tailwind CSS. It allows you to browse, create, upload, and delete folders and files on your local system via a browser interface. This README provides instructions on running the application, changing the default path, and exposing it to other devices using ngrok.
-
+This is a web-based folder management GUI built with Go and Tailwind CSS. It allows you to browse, create, upload, and delete folders and files on your local system via a browser interface. This README provides instructions on running the application, changing the default path, and exposing it to other devices using LocalTunnel, with support for Windows, Linux, and macOS.
 
 ---
 
@@ -16,13 +15,15 @@ This is a web-based folder management GUI built with Go and Tailwind CSS. It all
 Before you begin, ensure you have the following installed on your system:
 
 - **Go** (version 1.16 or later): [Download and install Go](https://go.dev/doc/install)
+- **Node.js and npm** (required for LocalTunnel): [Download and install Node.js](https://nodejs.org/en/download/)
+  - Verify installation by running `node --version` and `npm --version`.
 - **Git**: To clone the repository (optional if you already have the code)
 - A modern web browser (e.g., Chrome, Firefox)
-- An internet connection (for downloading ngrok and accessing the app from other devices)
+- An internet connection (for installing LocalTunnel and accessing the app from other devices)
 
 ## Running the Application
 
-Follow these steps to run the application locally on your machine:
+Follow these steps to run the application locally on your machine (Windows, Linux, or macOS):
 
 1. **Clone the Repository** (if you haven't already):
    ```bash
@@ -31,10 +32,14 @@ Follow these steps to run the application locally on your machine:
    ```
 
 2. **Install Dependencies**:
-   The application uses Go's standard library and no external Go packages, so no additional dependencies are required.
+   The application uses Go's standard library and no external Go packages, so no additional Go dependencies are required.
 
 3. **Run the Application**:
-   The application is set to run on port `8080` by default and uses `D:\` as the default base directory.
+   The application runs on port `8080` by default. The default base directory depends on your operating system:
+   - **Windows**: `D:\`
+   - **Linux/macOS**: `~/Documents` (e.g., `/home/user/Documents` on Linux or `/Users/user/Documents` on macOS)
+
+   Run the following command:
    ```bash
    go run main.go
    ```
@@ -42,29 +47,50 @@ Follow these steps to run the application locally on your machine:
    - Open your browser and navigate to `http://localhost:8080` to access the GUI.
 
 4. **Verify the Application**:
-   - You should see a folder management interface displaying the contents of the default directory (`D:\`).
+   - You should see a folder management interface displaying the contents of the default directory.
    - Features include creating folders, uploading files, searching, and deleting items.
 
 ## Changing the Default Path
 
-The default base directory is set to `D:\` in the code. To change this to a different path, you need to modify the `main.go` file. Here's how:
+The default base directory is automatically set based on your operating system (`D:\` for Windows, `~/Documents` for Linux/macOS). To change this to a different path, you need to modify the `main.go` file. Here's how:
 
 1. **Open the `main.go` File**:
    - Locate the `main.go` file in your project directory.
 
 2. **Find the Default Path**:
-   - Look for the line where the `baseDir` variable is defined. It looks like this:
+   - Look for the `getDefaultBaseDir` function near the beginning of the file. It looks like this:
      ```go
-     baseDir := "D:\\"
+     func getDefaultBaseDir() string {
+         switch sysOS := strings.ToLower(os.Getenv("OS")); {
+         case strings.Contains(sysOS, "windows"):
+             return "D:/" // Windows default
+         default:
+             homeDir, err := os.UserHomeDir()
+             if err != nil {
+                 log.Printf("Failed to get user home directory: %v, falling back to /tmp", err)
+                 return "/tmp" // Fallback for Linux/macOS
+             }
+             return filepath.Join(homeDir, "Documents") // e.g., /home/user/Documents or /Users/user/Documents
+         }
+     }
      ```
-   - This line is typically near the beginning of the `main` function.
 
 3. **Modify the Path**:
-   - Change the value of `baseDir` to your desired directory. For example, to set it to `C:\Users\YourUser\Documents`, update the line to:
+   - Update the `return` values in the `getDefaultBaseDir` function to your desired directory.
+   - **Windows Example**: To set it to `C:\Users\YourUser\Documents`, modify the Windows case:
      ```go
-     baseDir := "C:\\Users\\YourUser\\Documents"
+     return "C:/Users/YourUser/Documents"
      ```
-   - **Note**: Use double backslashes (`\\`) for Windows paths because Go interprets a single backslash as an escape character. For example, `C:\path` should be written as `C:\\path`.
+     - **Note**: On Windows, use forward slashes (`/`) or double backslashes (`\\`) in the path string (e.g., `C:\\path` or `C:/path`), as Go interprets a single backslash as an escape character.
+   - **Linux/macOS Example**: To set it to `/home/user/MyFolder`, modify the default case:
+     ```go
+     return "/home/user/MyFolder"
+     ```
+     - Alternatively, you can use `filepath.Join` to construct the path dynamically:
+       ```go
+       return filepath.Join("/home/user", "MyFolder")
+       ```
+     - **Note**: On Linux/macOS, use forward slashes (`/`) and avoid drive letters like `D:`.
 
 4. **Save the File**:
    - Save your changes to `main.go`.
@@ -81,130 +107,130 @@ The default base directory is set to `D:\` in the code. To change this to a diff
    - Refresh your browser at `http://localhost:8080`.
    - The interface should now display the contents of the new directory you set.
 
-## Exposing the Application with ngrok
+## Exposing the Application with LocalTunnel
 
-To access the application from other devices (e.g., a mobile phone or another computer), you can use ngrok to create a secure public URL for your locally running application. Follow these steps to download, install, and run ngrok, then access your app remotely.
+To access the application from other devices (e.g., a mobile phone or another computer), you can use LocalTunnel to create a secure public URL for your locally running application. LocalTunnel adds a layer of security by requiring a password to access the tunnel, which can only be retrieved from the same network. Follow these steps to install and run LocalTunnel, then access your app remotely.
 
-### Step 1: Download and Install ngrok
+### Step 1: Install LocalTunnel
 
-1. **Create an ngrok Account**:
-   - Go to [ngrok.com](https://ngrok.com) and sign up for a free account using your email, Google, or GitHub account.
-   - After signing up, you'll be directed to the ngrok dashboard.
-
-2. **Download ngrok**:
-   - On the ngrok dashboard, go to the "Getting Started" section or visit the [ngrok download page](https://ngrok.com/download).
-   - Select the version for your operating system (e.g., Windows, macOS, or Linux) and download the binary.
-   - For Windows, you'll download a `ngrok.zip` file. For macOS/Linux, you'll get a similar zip file or a direct binary.
-
-3. **Extract the Binary**:
-   - Unzip the downloaded file to a convenient location on your computer (e.g., `C:\ngrok` on Windows or `~/ngrok` on macOS/Linux).
-   - You'll find an executable file named `ngrok` (or `ngrok.exe` on Windows).
-
-4. **Add ngrok to Your System Path** (Optional but Recommended):
-   - To run ngrok from any terminal location, add the directory containing `ngrok` to your system's PATH.
-   - **Windows**:
-     - Right-click on 'This PC' or 'My Computer', select 'Properties', then 'Advanced system settings'.
-     - Click 'Environment Variables'.
-     - Under 'System Variables' or 'User Variables', find the `Path` variable, click 'Edit', and add the path to the folder containing `ngrok.exe` (e.g., `C:\ngrok`).
-   - **macOS/Linux**:
-     - Open your terminal and edit your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`):
-       ```bash
-       echo 'export PATH=$PATH:/path/to/ngrok' >> ~/.bashrc
-       source ~/.bashrc
-       ```
-     - Replace `/path/to/ngrok` with the actual path (e.g., `~/ngrok`).
-
-### Step 2: Authenticate ngrok
-
-1. **Get Your Authtoken**:
-   - In the ngrok dashboard, go to the "Your Authtoken" section (usually under "Getting Started").
-   - Copy the authtoken provided (it looks like a long string, e.g., `2aB3cD4eF5gH6iJ7kL8mN9oP0qR1sT_xxxxxxxxxxxxxxxxxxxxxx`).
-
-2. **Authenticate ngrok**:
-   - Open a terminal and navigate to the directory containing the `ngrok` executable (or just use `ngrok` if you added it to your PATH).
-   - Run the following command, replacing `<your_authtoken>` with the token you copied:
+1. **Ensure Node.js and npm Are Installed**:
+   - LocalTunnel is a Node.js package, so you need Node.js and npm installed (see Prerequisites).
+   - Verify by running:
      ```bash
-     ngrok authtoken <your_authtoken>
+     node --version
+     npm --version
      ```
-   - You should see a confirmation message like:
-     ```
-     Authtoken saved to configuration file: /path/to/ngrok.yml
-     ```
-   - This step links your ngrok client to your account and enables longer tunnel durations and additional features.
 
-### Step 3: Run ngrok to Expose Your Application
+2. **Install LocalTunnel Globally**:
+   - Open a terminal and install LocalTunnel using npm:
+     ```bash
+     npm install -g localtunnel
+     ```
+   - This installs the `lt` command-line tool globally, allowing you to use it from any terminal.
+
+3. **Verify Installation**:
+   - Run the following command to check if LocalTunnel is installed correctly:
+     ```bash
+     lt --version
+     ```
+   - You should see the version number of LocalTunnel (e.g., `1.9.2`).
+
+### Step 2: Run LocalTunnel to Expose Your Application
 
 1. **Ensure Your Application is Running**:
    - Make sure your Go application is running on `http://localhost:8080` (as described in the "Running the Application" section).
 
-2. **Start an ngrok Tunnel**:
+2. **Start a LocalTunnel Session**:
    - In a new terminal window (or the same one if your Go app is running in the background), run:
      ```bash
-     ngrok http 8080
+     lt --port 8080 --print-access-pass
      ```
-   - ngrok will create a secure tunnel and provide a public URL, such as `https://abc123.ngrok.io`.
-   - You'll see output similar to:
-     ```
-     ngrok by @inconshreveable
-     Session Status                online
-     Account                       your-account (Plan: Free)
-     Version                       3.12.0
-     Region                        United States (us)
-     Web Interface                 http://127.0.0.1:4040
-     Forwarding                    https://abc123.ngrok.io -> http://localhost:8080
-     Forwarding                    http://abc123.ngrok.io -> http://localhost:8080
-     ```
+   - The `--port 8080` flag tells LocalTunnel to tunnel traffic to your application running on port 8080.
+   - The `--print-access-pass` flag ensures the access password is displayed in the terminal.
 
-3. **Access the ngrok Web Interface** (Optional):
-   - Open `http://127.0.0.1:4040` in your browser to see the ngrok dashboard.
-   - This dashboard shows tunnel status and HTTP request details, which can be useful for debugging.
+3. **Retrieve the Public URL and Password**:
+   - LocalTunnel will generate a public URL, such as `https://<random-subdomain>.loca.lt`.
+   - It will also display an access password in the terminal, for example:
+     ```
+     your url is: https://<random-subdomain>.loca.lt
+     Access password: <your-password>
+     ```
+   - **Where to Find the Password**: The password is displayed in the terminal output on the machine where you ran the `lt` command. It is only visible on the local network where the tunnel is initiated, adding an extra layer of security.
+   - **Note**: If you don’t see the password, ensure you included the `--print-access-pass` flag. Without this flag, LocalTunnel may not display the password, and you’d need to check the LocalTunnel dashboard or logs (if available).
 
-### Step 4: Access the Application from Other Devices
+4. **Access the LocalTunnel Web Interface** (Optional):
+   - LocalTunnel doesn’t provide a built-in web interface like ngrok, but you can visit `https://loca.lt` for more information or to check your tunnel status if you’ve set up a custom subdomain (requires a paid plan).
+
+### Step 3: Access the Application from Other Devices
 
 1. **Share the Public URL**:
-   - Copy the `https://abc123.ngrok.io` URL from the ngrok terminal output (use the HTTPS version for security).
+   - Copy the URL provided by LocalTunnel (e.g., `https://<random-subdomain>.loca.lt`).
    - Share this URL with others or open it on another device (e.g., your phone, tablet, or another computer).
 
-2. **Access the Application**:
-   - On the other device, open a browser and navigate to the ngrok URL (e.g., `https://abc123.ngrok.io`).
-   - You should see the same folder management GUI as on your local machine.
-   - **Note**: The free version of ngrok generates a random URL each time you start a tunnel. If you need a static URL, consider upgrading to a paid ngrok plan and reserving a domain.
+2. **Enter the Password**:
+   - When you or someone else accesses the URL, a password prompt will appear in the browser.
+   - Enter the password that was displayed in your terminal (e.g., `<your-password>`).
+   - **Security Note**: The password ensures that only those who have access to the local network (where the tunnel was started) can obtain the password and access the application, making LocalTunnel more secure than an open tunnel.
 
-3. **Test Features**:
+3. **Access the Application**:
+   - After entering the correct password, you should see the same folder management GUI as on your local machine.
+   - **Note**: LocalTunnel generates a random subdomain each time you start a tunnel. If you need a fixed subdomain, you can use the `--subdomain` flag (e.g., `lt --port 8080 --subdomain mysubdomain --print-access-pass`), but this may require a paid plan with LocalTunnel.
+
+4. **Test Features**:
    - Browse folders, create new folders, upload files, and delete items from the remote device.
    - Ensure all features work as expected.
 
-### Step 5: Stop ngrok
+### Step 4: Stop LocalTunnel
 
-- When you're done, stop the ngrok tunnel by pressing `Ctrl+C` in the terminal where ngrok is running.
+- When you're done, stop the LocalTunnel session by pressing `Ctrl+C` in the terminal where LocalTunnel is running.
 - This will close the public URL, and your application will no longer be accessible from other devices.
 
 ## Security Considerations
 
-- **ngrok Security**:
-  - The free version of ngrok creates a publicly accessible URL, meaning anyone with the URL can access your application while the tunnel is active. Be cautious about leaving sensitive features (e.g., file deletion) enabled during testing.
-  - Consider using ngrok's paid features like IP restrictions or OAuth to secure your tunnel if needed.
+- **LocalTunnel Security**:
+  - LocalTunnel requires a password to access the tunnel, which adds a layer of security compared to an open tunnel. The password is only displayed on the local network where the tunnel is initiated, ensuring that only authorized users can access it.
+  - Be cautious about sharing the password outside your trusted network. If someone else on your local network can see the terminal output, they could retrieve the password.
 
 - **Application Security**:
-  - The application itself doesn't implement authentication, so anyone with access to the URL can interact with your file system. For production use, add authentication mechanisms to the Go application.
+  - The application itself doesn't implement authentication, so anyone with the URL and password can interact with your file system. For production use, add authentication mechanisms to the Go application to restrict access.
+
+- **File Permissions (Linux/macOS)**:
+  - On Linux/macOS, ensure the application has read/write permissions for the directories it accesses. You may need to adjust permissions using `chmod` or run the application with `sudo` if accessing restricted directories.
 
 ## Troubleshooting
 
 - **Application Not Starting**:
   - Ensure Go is installed correctly (`go version` should return a version number).
   - Check for errors in the terminal when running `go run main.go`. Common issues include invalid paths or permissions.
+  - **Linux/macOS**: If the default path (`~/Documents`) doesn’t exist, create it or update `getDefaultBaseDir` to a valid path:
+    ```bash
+    mkdir -p ~/Documents
+    ```
 
-- **ngrok Tunnel Not Working**:
-  - Verify that your application is running on `http://localhost:8080` before starting ngrok.
-  - Ensure the port in the ngrok command (`ngrok http 8080`) matches the port your app is using.
-  - If you see a "502 Bad Gateway" error when accessing the ngrok URL, your local server might not be running.
+- **LocalTunnel Not Working**:
+  - Verify that your application is running on `http://localhost:8080` before starting LocalTunnel.
+  - Ensure the port in the LocalTunnel command (`lt --port 8080`) matches the port your app is using.
+  - If you can’t access the URL, double-check that you entered the correct password. The password is case-sensitive.
+  - If LocalTunnel fails to start, ensure Node.js and npm are installed correctly, and reinstall LocalTunnel if necessary:
+    ```bash
+    npm install -g localtunnel
+    ```
 
 - **Access Denied on Other Devices**:
-  - Ensure your ngrok tunnel is active and the URL hasn't expired (free tunnels expire after a few hours unless you keep the terminal open).
-  - Check if your firewall is blocking inbound connections to port 8080. You may need to allow this port in your firewall settings.
+  - Ensure your LocalTunnel session is active. The URL expires when you stop the `lt` command.
+  - Check if your firewall is blocking inbound connections to port 8080. You may need to allow this port:
+    - **Windows**: Use Windows Firewall settings to allow port 8080.
+    - **Linux**: Use `ufw` (e.g., `sudo ufw allow 8080`).
+    - **macOS**: Use System Preferences > Security & Privacy > Firewall to allow incoming connections.
+  - If the password prompt rejects your password, ensure you copied it correctly from the terminal output.
+
+- **Path Issues on Linux/macOS**:
+  - If you see errors related to paths, ensure the paths in `main.go` use forward slashes (`/`) and are valid for your system.
+  - Check the browser console and server logs for path-related errors.
 
 ## Additional Resources
 
 - [Go Documentation](https://go.dev/doc/)
-- [ngrok Documentation](https://ngrok.com/docs)
+- [LocalTunnel Documentation](https://theboroer.github.io/localtunnel-www/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [Node.js Documentation](https://nodejs.org/en/docs/)
