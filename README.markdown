@@ -171,10 +171,11 @@ To access the application from other devices (e.g., a mobile phone or another co
    - When you or someone else accesses the URL, a password prompt will appear in the browser.
    - Enter the password that was displayed in your terminal (e.g., `<your-password>`).
    - **Security Note**: The password ensures that only those who have access to the local network (where the tunnel was started) can obtain the password and access the application, making LocalTunnel more secure than an open tunnel.
+   - Tunnel password can be retrieved from  "curl --location 'https://loca.lt/mytunnelpassword'" Or just paste this > "https://loca.lt/mytunnelpassword" in your browser .
 
 3. **Access the Application**:
    - After entering the correct password, you should see the same folder management GUI as on your local machine.
-   - **Note**: LocalTunnel generates a random subdomain each time you start a tunnel. If you need a fixed subdomain, you can use the `--subdomain` flag (e.g., `lt --port 8080 --subdomain mysubdomain --print-access-pass`), but this may require a paid plan with LocalTunnel.
+   - **Note**: LocalTunnel generates a random subdomain each time you start a tunnel. If you need a fixed subdomain, you can use the `--subdomain` flag (e.g., `lt --port 8080 --subdomain mysubdomain `), but this may require a paid plan with LocalTunnel.
 
 4. **Test Features**:
    - Browse folders, create new folders, upload files, and delete items from the remote device.
