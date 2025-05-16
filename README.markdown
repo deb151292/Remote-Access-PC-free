@@ -26,8 +26,8 @@ Follow these steps to run the application locally on your machine (Windows, Linu
 
 1. **Clone the Repository** (if you haven't already):
    ```bash
-   git clone https://github.com/deb151292/Remote-Access-Windows-PC.git
-   cd Remote-Access-Windows-PC
+   git clone https://github.com/deb151292/Remote-Access-PC-free.git
+   cd Remote-Access-PC-free
    ```
 
 2. **Install Dependencies**:
