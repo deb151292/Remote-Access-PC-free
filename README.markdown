@@ -5,7 +5,7 @@ This is a web-based folder management GUI built with Go and Tailwind CSS. It all
 
 ## 📸 Preview
 
-![Remote File Manager](screenshot-remore-file-access.jpg)
+![Remote File Manager](screenshot-remore-file-access.png)
 
 ---
 
