@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -18,19 +19,55 @@ var defaultBaseDir = filepath.FromSlash(getDefaultBaseDir())
 
 // getDefaultBaseDir returns a platform-appropriate default directory
 func getDefaultBaseDir() string {
-	// Check the operating system at runtime
 	switch sysOS := strings.ToLower(os.Getenv("OS")); {
 	case strings.Contains(sysOS, "windows"):
-		return "D:/" // Windows default
+		// Scan drives from C: to Z:
+		for i := 'C'; i <= 'Z'; i++ {
+			drive := string(i) + ":/"
+			if _, err := os.Stat(drive); err == nil {
+				log.Printf("Found drive: %s", drive)
+				return drive // Return first existing drive
+			}
+		}
+		log.Println("No drives found, defaulting to C:/")
+		return "C:/"
 	default:
 		// For Linux/macOS, use the user's home directory
-		homeDir, err := os.UserHomeDir() // Now correctly refers to the os package
+		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			log.Printf("Failed to get user home directory: %v, falling back to /tmp", err)
 			return "/tmp" // Fallback for Linux/macOS
 		}
 		return filepath.Join(homeDir, "Documents") // e.g., /home/user/Documents or /Users/user/Documents
 	}
+}
+
+// getAvailableDrives returns a list of available drives on Windows
+func getAvailableDrives() []string {
+	drives := []string{}
+	if runtime.GOOS == "windows" {
+		for i := 'C'; i <= 'Z'; i++ {
+			drive := string(i) + ":/"
+			if _, err := os.Stat(drive); err == nil {
+				drives = append(drives, drive)
+			}
+		}
+	}
+	return drives
+}
+
+// getDriveFromPath extracts the drive letter from a path (Windows only)
+func getDriveFromPath(path string) string {
+	if runtime.GOOS != "windows" {
+		return ""
+	}
+	// Normalize path separators
+	path = strings.ReplaceAll(path, "\\", "/")
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 && len(parts[0]) >= 2 && parts[0][1] == ':' {
+		return parts[0] + "/"
+	}
+	return ""
 }
 
 func main() {
@@ -59,24 +96,66 @@ func fileBrowser(w http.ResponseWriter, r *http.Request) {
 	currentPath = filepath.Clean(currentPath)
 	log.Printf("Sanitized currentPath: %s", currentPath)
 
-	// Ensure the path doesn't go above defaultBaseDir
-	absDefaultBaseDir, err := filepath.Abs(defaultBaseDir)
-	if err != nil {
-		log.Printf("Failed to get absolute path for defaultBaseDir %s: %v", defaultBaseDir, err)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
-		return
-	}
-	absCurrentPath, err := filepath.Abs(currentPath)
-	if err != nil {
-		log.Printf("Failed to get absolute path for currentPath %s: %v", currentPath, err)
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
-	}
-	if !strings.HasPrefix(absCurrentPath, absDefaultBaseDir) {
-		log.Printf("Path %s is above defaultBaseDir %s, redirecting to defaultBaseDir", absCurrentPath, absDefaultBaseDir)
-		redirectURL := "/?path=" + url.QueryEscape(defaultBaseDir)
-		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-		return
+	// For Windows, ensure the path's drive is one of the available drives
+	availableDrives := getAvailableDrives()
+	if runtime.GOOS == "windows" {
+		currentDrive := getDriveFromPath(currentPath)
+		if currentDrive == "" {
+			log.Printf("No valid drive in path %s, redirecting to defaultBaseDir", currentPath)
+			redirectURL := "/?path=" + url.QueryEscape(defaultBaseDir)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
+		// Check if the current drive is in the list of available drives
+		driveFound := false
+		for _, drive := range availableDrives {
+			if strings.EqualFold(currentDrive, drive) {
+				driveFound = true
+				break
+			}
+		}
+		if !driveFound {
+			log.Printf("Drive %s not in available drives, redirecting to defaultBaseDir", currentDrive)
+			redirectURL := "/?path=" + url.QueryEscape(defaultBaseDir)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
+		// Ensure the path doesn't go above the drive root (e.g., D:/)
+		absCurrentPath, err := filepath.Abs(currentPath)
+		if err != nil {
+			log.Printf("Failed to get absolute path for currentPath %s: %v", currentPath, err)
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+		absDrive := filepath.Clean(currentDrive)
+		if !strings.HasPrefix(absCurrentPath, absDrive) {
+			log.Printf("Path %s is above drive root %s, redirecting to drive root", absCurrentPath, absDrive)
+			redirectURL := "/?path=" + url.QueryEscape(currentDrive)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+	} else {
+		// For Linux/macOS, ensure the path doesn't go above defaultBaseDir
+		absDefaultBaseDir, err := filepath.Abs(defaultBaseDir)
+		if err != nil {
+			log.Printf("Failed to get absolute path for defaultBaseDir %s: %v", defaultBaseDir, err)
+			http.Error(w, "Server configuration error", http.StatusInternalServerError)
+			return
+		}
+		absCurrentPath, err := filepath.Abs(currentPath)
+		if err != nil {
+			log.Printf("Failed to get absolute path for currentPath %s: %v", currentPath, err)
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+		if !strings.HasPrefix(absCurrentPath, absDefaultBaseDir) {
+			log.Printf("Path %s is above defaultBaseDir %s, redirecting to defaultBaseDir", absCurrentPath, absDefaultBaseDir)
+			redirectURL := "/?path=" + url.QueryEscape(defaultBaseDir)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
 	}
 
 	// Check if the path is safe
@@ -145,21 +224,31 @@ func fileBrowser(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Get available drives for the dropdown (Windows only)
+	// availableDrives := getAvailableDrives()
+
+	// Determine the OS for conditional rendering in the template
+	osType := runtime.GOOS
+
 	// Template data
 	data := struct {
-		Files          []FileInfo
-		CurrentPath    string
-		DefaultBaseDir string
-		Separator      string
-		Error          string
-		Success        string
+		Files           []FileInfo
+		CurrentPath     string
+		DefaultBaseDir  string
+		Separator       string
+		Error           string
+		Success         string
+		AvailableDrives []string
+		OSType          string
 	}{
-		Files:          list,
-		CurrentPath:    currentPath,
-		DefaultBaseDir: defaultBaseDir,
-		Separator:      string(filepath.Separator),
-		Error:          r.URL.Query().Get("error"),
-		Success:        r.URL.Query().Get("success"),
+		Files:           list,
+		CurrentPath:     currentPath,
+		DefaultBaseDir:  defaultBaseDir,
+		Separator:       string(filepath.Separator),
+		Error:           r.URL.Query().Get("error"),
+		Success:         r.URL.Query().Get("success"),
+		AvailableDrives: availableDrives,
+		OSType:          osType,
 	}
 
 	log.Printf("Rendering template with CurrentPath: %s", currentPath)
